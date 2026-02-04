@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>해커스 영상 추적 비서</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2b6bf3;
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-radius: 16px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        }
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 40px 20px;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 20px; }
+        .card { background: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 30px; }
+        .header-section { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px solid #f1f3f5; }
+        .app-title { font-size: 26px; font-weight: 800; color: #1a1a1a; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        
+        /* 날짜 입력 섹션 */
+        .section-label { font-size: 15px; font-weight: 700; color: #333; margin: 20px 0 10px 0; display: block; }
+        .date-input-container { margin-bottom: 25px; }
+        .date-input { width: 100%; padding: 15px; border: 2px solid #cbd5e1; border-radius: 12px; font-size: 18px; text-align: center; box-sizing: border-box; outline: none; transition: 0.3s; }
+        .date-input:focus { border-color: var(--primary-color); background: #f8faff; }
+
+        /* 채널 그리드 */
+        .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; padding: 15px; border: 1px solid #eee; border-radius: 12px; background: #fff; }
+        .channel-btn { background: #fff; border: 1px solid #dfe3e8; border-radius: 8px; padding: 10px 5px; font-size: 13px; color: #666; cursor: pointer; text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center; min-height: 45px; word-break: keep-all; }
+        .channel-btn:hover { border-color: var(--primary-color); color: var(--primary-color); background: #f8faff; }
+        .channel-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); font-weight: 600; box-shadow: 0 3px 8px rgba(43, 107, 243, 0.3); }
+
+        /* 결과 표시 */
+        #resultArea { margin-top: 25px; display: none; text-align: center; border-top: 2px solid #f1f3f5; padding-top: 25px; }
+        .video-title { font-size: 17px; font-weight: 700; margin-bottom: 15px; line-height: 1.4; color: #1a1a1a; }
+        .thumb-preview { width: 100%; max-width: 500px; border-radius: 12px; margin-bottom: 20px; box-shadow: var(--shadow); border: 1px solid #eee; }
+        .action-group { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .action-btn { padding: 12px 20px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-link { background: #e7f0ff; color: var(--primary-color); }
+        .btn-copy { background: #f1f3f5; color: #495057; }
+        .btn-down { background: #e6fcf5; color: #099268; }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+        .loading { display: none; text-align: center; margin-top: 15px; color: var(--primary-color); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="header-section">
+            <div class="app-title">
+                <i class="fa-brands fa-youtube" style="color:#ff0000;"></i> 해커스 영상 추적 비서
+            </div>
+        </div>
+
+        <div class="date-input-container">
+            <span class="section-label">1. 업로드 날짜 입력</span>
+            <input type="text" id="dateInput" class="date-input" placeholder="YYMMDD (예: 230509)" maxlength="6">
+        </div>
+
+        <span class="section-label">2. 채널 선택</span>
+        <div class="channel-grid" id="channelGrid"></div>
+
+        <div id="loading" class="loading">
+            <i class="fa-solid fa-spinner fa-spin"></i> 영상을 찾는 중입니다, 박사님!
+        </div>
+
+        <div id="resultArea">
+            <div id="vTitle" class="video-title"></div>
+            <img id="vThumb" class="thumb-preview" src="">
+            <div class="action-group">
+                <button onclick="copyLink()" class="action-btn btn-link"><i class="fa-solid fa-link"></i> 링크 복사</button>
+                <button onclick="copyImage()" class="action-btn btn-copy"><i class="fa-solid fa-image"></i> 썸네일 복사</button>
+                <button id="downloadBtn" class="action-btn btn-down"><i class="fa-solid fa-download"></i> 다운로드</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ★★★ 여기에 박사님의 API 키를 넣어주세요 ★★★
+    const FIXED_API_KEY = 'AIzaSyC6xHUqtRxDWpdc2fN-IVg2UKEEXeGX4qU'; 
+
+    const channels = {
+        "해커스 토익": "UCTdflp7iCb0qj61On66yOAw", "해커스잡": "UCjhD0iUV1qyRJoLkwM3ignA", "해커스공무원": "UCcDz72Vic8ILPpIhcFWdkvA",
+        "공인중개사": "UCdtvVo04Fn1gXe38HSszbnw", "해커스경찰": "UCH4YqIY3Gi_l-qbf_Lj2f3w", "김진태 토익": "UCW2iaEZAlpZ48jBV7Cxuoxg",
+        "구자연 토익": "UCeRI1uV1_5iS-cM37LvoWOw", "토스&오픽": "UCWVqJF4TEzCscyOT_uITrmg", "민지원 토익": "UCE1Qsm2_IFyJfhFtcbBCAeg",
+        "한나 토익": "UCG-EcAtKyA4Zful5VD_pv8A", "로스쿨·변호사": "UCNxyohrWP0-4J7aL2AzHT0A", "감평사&행정사": "UC6JhVkziP3BOqsaJeJ8cMDw",
+        "해커스 PSAT": "UCB7dVWW1HajiZOqACiTrgwg", "해커스 경영": "UCMO38w-Zkx_6a-AyDrITq1A", "해커스 금융": "UCj_bvSTgaEwMfg1NpAMY0ig",
+        "해커스소방": "UCG2BAw5mjP7MXoJJroUYbDw", "해커스 유학": "UCYybN6xbo2rtdb7XGqYK_-A", "해커스 일본어": "UCVsW_QS-bzIVDMChrRuBxPA",
+        "해커스 임용": "UC52CZiUrhsKJX7t5bE8ZQ2Q", "해커스 자격증": "UC4REETmYtlvqHunx2tl2Pmg", "해커스 중국어": "UCBARjw2l2cbTzxQLIYwFm6w",
+        "해커스톡": "UCmjwMlVeo5DoH8xCmMQlVgA", "해커스 편입": "UCoLlc4K-jpTorSHvwH9cEQQ", "해커스 한국사": "UCVeKJzXoDRBdmcUoe8i09PA"
+    };
+
+    let currentVideoData = { id: '', thumb: '' };
+
+    window.onload = function() {
+        const container = document.getElementById('channelGrid');
+        Object.entries(channels).sort().forEach(([name, id]) => {
+            const btn = document.createElement('div');
+            btn.className = 'channel-btn';
+            btn.innerHTML = `<span>${name}</span>`;
+            btn.onclick = () => fetchVideo(id, btn);
+            container.appendChild(btn);
+        });
+    };
+
+    async function fetchVideo(channelId, btn) {
+        const dateRaw = document.getElementById('dateInput').value;
+        if (dateRaw.length !== 6) { alert("날짜 6자리를 입력해주세요!"); return; }
+        if (FIXED_API_KEY.includes('여기에')) { alert("코드 상단에 API 키를 먼저 입력해주세요!"); return; }
+
+        document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const loading = document.getElementById('loading');
+        const resultArea = document.getElementById('resultArea');
+        loading.style.display = 'block';
+        resultArea.style.display = 'none';
+
+        const year = "20" + dateRaw.substring(0, 2);
+        const month = dateRaw.substring(2, 4);
+        const day = dateRaw.substring(4, 6);
+        const start = `${year}-${month}-${day}T00:00:00Z`;
+        const end = `${year}-${month}-${day}T23:59:59Z`;
+
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&publishedAfter=${start}&publishedBefore=${end}&type=video&key=${FIXED_API_KEY}&maxResults=1`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.items && data.items.length > 0) {
+                const item = data.items[0];
+                currentVideoData.id = item.id.videoId;
+                currentVideoData.thumb = item.snippet.thumbnails.high.url.replace("hqdefault", "maxresdefault");
+                
+                document.getElementById('vTitle').innerText = item.snippet.title;
+                document.getElementById('vThumb').src = currentVideoData.thumb;
+                
+                document.getElementById('downloadBtn').onclick = () => downloadThumb(currentVideoData.thumb, dateRaw);
+                resultArea.style.display = 'block';
+            } else { alert("해당 날짜에 업로드된 영상이 없습니다."); }
+        } catch (e) { alert("API 오류가 발생했습니다. 키를 확인해주세요."); }
+        finally { loading.style.display = 'none'; }
+    }
+
+    async function copyLink() {
+        const link = `https://youtu.be/${currentVideoData.id}`;
+        await navigator.clipboard.writeText(link);
+        alert("영상 링크 복사 완료!");
+    }
+
+    async function copyImage() {
+        try {
+            const response = await fetch(currentVideoData.thumb);
+            const blob = await response.blob();
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            alert("이미지가 클립보드에 복사되었습니다!");
+        } catch (e) { alert("이미지 복사에 실패했습니다."); }
+    }
+
+    async function downloadThumb(url, date) {
+        const image = await fetch(url);
+        const blob = await image.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `thumb_${date}_${currentVideoData.id}.jpg`;
+        link.click();
+    }
+</script>
+</body>
+</html>
